@@ -1,0 +1,11 @@
+*.log
+*.pyc
+*.json
+Evaluation/Data
+src
+candolle_5patch
+build
+*.pt
+*.jpg
+*.hef
+*.onnx

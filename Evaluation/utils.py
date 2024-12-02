@@ -20,7 +20,6 @@ import json
 
 IMAGE_EXTENSIONS: Tuple[str, ...] = ('.jpg', '.png', '.bmp', '.jpeg')
 
-
 def loadJson(path):
     # Open and read the JSON file
     with open(path, 'r') as file:

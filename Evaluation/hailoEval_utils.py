@@ -4,7 +4,7 @@ from hailo_platform import (
     HEF, VDevice, HailoStreamInterface, InferVStreams,
     ConfigureParams, InputVStreamParams, OutputVStreamParams, FormatType
 )
-import json
+from pathlib import Path
 import numpy as np
 import pandas as pd
 import os
@@ -14,10 +14,39 @@ import re
 from PIL import Image
 import torch
 from torcheval.metrics import Throughput
+from os import walk
 from utils import loadJson,transform
 
-def get_pred_hailo(input_folder,hailoModelText,hailoModelImage,use5Scentens = False):
+def getCorrespondingGemm(modelName):
+    """
+    Get gemm layer json path
+    """
+    gemmFolder_path = "Evaluation/resources/gemmLayer"
 
+    filenames = next(walk(gemmFolder_path), (None, None, []))[2]
+    modelName = modelName.split(".")[0]
+    for filename in filenames:
+        if modelName in filename:
+            gemmFile = filename
+    gemmFile_path = gemmFolder_path + "/" + gemmFile
+    
+    return gemmFile_path
+
+def getCorrespondingTextEmb(modelName):
+    """
+    Get text embeddings json path
+    """
+    textFolder_path = "Evaluation/resources/TextEmbeddings"
+    filenames = next(walk(textFolder_path), (None, None, []))[2]
+    modelName = modelName.split(".")[0]
+    for filename in filenames:
+        if modelName in filename:
+            textFile = filename
+    textFile_path = textFolder_path + "/" + textFile
+    
+    return textFile_path
+    
+def get_pred_hailo(input_folder,hailoModelText,hailoModelImage,use5Scentens = False):
     '''
     Function that calculates the probability that each image belongs to each class
     In: path of the image folder, tokenized text prompts 
@@ -72,12 +101,10 @@ def get_pred_hailo(input_folder,hailoModelText,hailoModelImage,use5Scentens = Fa
         scene_list.append(int(os.path.basename(file).split('.')[0].split('_')[1]))
         img_list.append(int(os.path.basename(file).split('.')[0].split('_')[2]))
 
-        
     df_pred = pd.DataFrame({'Scene': scene_list, 'Image': img_list, 'In_Arch': in_arch_list, 'In_Constr': in_constr_list, 'Out_Constr': out_constr_list, 'Out_Urban': out_urb_list, 'Forest': out_for_list, 'In': in_list, 'Out': out_list})
     return df_pred
 
 def get_throughput_hailo(input_folder,hailoModelText,hailoModelImage,use5Scentens = False):
-
     '''
     Function that calculates the probability that each image belongs to each class
     In: path of the image folder, tokenized text prompts 
@@ -257,7 +284,6 @@ class HailoCLIPImage:
     def _run_inference(self,image):
         # Setup device and configure model
         with VDevice() as device:
-            #print(f"using {device}")
             
             # Configure network
             config_params = ConfigureParams.create_from_hef(
@@ -280,13 +306,13 @@ class HailoCLIPImage:
             
             # Prepare input data
             input_info = self.hef.get_input_vstream_infos()[0]
-            dataset = image.detach().numpy().astype(np.float32)
-            dataset = np.transpose(dataset, (0,2, 3, 1))
+            dataset = image.detach().numpy().astype(np.float32,order='F')
+            dataset = np.transpose(dataset, (0,2, 3, 1)).astype(np.float32,order='F')
             
             # Run inference
             with network_group.activate():
                 with InferVStreams(network_group, input_params, output_params) as pipeline:
-                    results = pipeline.infer({input_info.name: dataset})
+                    results = pipeline.infer({input_info.name: np.ascontiguousarray(dataset)})
                     return results
                       
 
@@ -326,9 +352,9 @@ if __name__ == "__main__":
     
     
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    gemmLayerjson_path = "gemm_layer.json"
-    hef_path = 'Evaluation/resources/Modified_RN50x4.hef'
-    onnx_path = "/home/lukas/Documents/Eval/Evaluation/resources/modified_RN50x4_simple.onnx"
+    gemmLayerjson_path = "Evaluation/resources/json/gemm_layer_RN50x4.json"
+    hef_path = 'Evaluation/resources/hef/Modified_RN50x4.hef'
+    onnx_path = "Evaluation/resources/onnx/modified_RN50x4_simple.onnx"
     
     hailoInference = HailoCLIPImage(hef_path,gemmLayerjson_path)
     model, preprocess = clip.load("RN50x4", device=device)

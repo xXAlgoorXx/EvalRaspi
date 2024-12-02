@@ -6,7 +6,7 @@ import pandas as pd
 import seaborn as sns
 from PIL import Image
 
-from sklearn.metrics import accuracy_score, classification_report,confusion_matrix
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 from sklearn.preprocessing import LabelEncoder
 
 from collections import Counter

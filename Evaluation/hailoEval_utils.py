@@ -22,7 +22,7 @@ def getCorrespondingGemm(modelName):
     Get gemm layer json path
     """
     gemmFolder_path = "Evaluation/resources/gemmLayer"
-
+    gemmFile = "str"
     filenames = next(walk(gemmFolder_path), (None, None, []))[2]
     modelName = modelName.split(".")[0]
     for filename in filenames:
@@ -36,9 +36,13 @@ def getCorrespondingTextEmb(modelName):
     """
     Get text embeddings json path
     """
+    textFile = "str"
     textFolder_path = "Evaluation/resources/TextEmbeddings"
     filenames = next(walk(textFolder_path), (None, None, []))[2]
     modelName = modelName.split(".")[0]
+    if "TinyCLIP" not in modelName:
+        modelName = modelName.split("_")[1]
+        
     for filename in filenames:
         if modelName in filename:
             textFile = filename
@@ -54,6 +58,7 @@ def get_pred_hailo(input_folder,hailoModelText,hailoModelImage,use5Scentens = Fa
     '''
     # List all files in the input folder
     files = os.listdir(input_folder)
+    # files = files[0:10]
 
     in_list = []
     out_list = []
@@ -166,10 +171,15 @@ class HailoCLIPText:
         self.loadTextembeddings(json_path)
         
     def getModelName(self):
-        match = re.search(r"_([A-Za-z0-9]+)\.json$", self.json_path)
-        if match:
-            name = match.group(1)
-            return name
+        if self.use5Scentens:
+            name = self.json_path.split("/")[-1]
+            name = name.split(".")[0]
+            name  = name.split("_")[1]
+        else:
+            name = self.json_path.split("/")[-1]
+            name = name.split(".")[0]
+            name  = name.split("_")[1:]
+        return name
 
     def encode_text(self,level,use5Scentens):
         if level == 1:
@@ -248,6 +258,9 @@ class HailoCLIPText:
 class HailoCLIPImage:
     def __init__(self,hef_path,postprocessjson_path = None):
         self.hef = HEF(hef_path)
+        self.isTinyClip = False
+        if "TinyCLIP" in hef_path:
+            self.isTinyClip = True
         self.postprocess = None
         if postprocessjson_path != None:
             self.postprocess = RestOfGraph(postprocessjson_path)
@@ -266,6 +279,8 @@ class HailoCLIPImage:
         result = self._run_inference(image)
         result = np.array(list(result.values())[0]).squeeze()
         posP_image = self.postprocess(result)
+        if self.isTinyClip:
+            posP_image = posP_image[0]
         return posP_image
     
     def performPostprocess(self,input):

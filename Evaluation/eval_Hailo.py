@@ -18,12 +18,13 @@ textEmbeddings_path = "Evaluation/resources/json/textEmbeddings_RN50x4.json"
 
 
 def main():
-    heffiles = next(os.walk(hefFolder_path), (None, None, []))[2]
+    heffiles = next(os.walk(hefFolder_path), (None, None, []))[2] #Get files from hef dir
     for hef in heffiles:
         hef_path = hefFolder_path + "/" + hef
-        postprocess_path = getCorrespondingGemm(hef_path)
-        textEmbeddings_path = getCorrespondingTextEmb(hef_path)
-        
+        postprocess_path = getCorrespondingGemm(hef)
+        print(f"Gemm path:{postprocess_path}")
+        textEmbeddings_path = getCorrespondingTextEmb(hef)
+        print(f"Gemm path:{textEmbeddings_path}")
         hailoImagemodel = HailoCLIPImage(hef_path,postprocess_path)
         hailoTextmodel = HailoCLIPText(textEmbeddings_path)
         modelname = hailoTextmodel.getModelName()

@@ -3,31 +3,28 @@ import pandas as pd
 from sklearn.metrics import accuracy_score
 from pathlib import Path
 from cpuEval_utils import get_max_class_with_threshold,get_trueClass,find_majority_element,printAndSaveHeatmap
-from hailoEval_utils import get_pred_hailo,get_throughput_hailo, HailoCLIPImage, HailoCLIPText, getCorrespondingGemm, getCorrespondingTextEmb
-
+from hailoEval_utils import get_pred_hailo,get_throughput_hailo, HailoCLIPImage, HailoCLIPText, getCorrespondingGemm, getCorrespondingTextEmb, getModelfiles
 
 # Pathes
 outputPath = Path("Evaluation/Data/Hailo")
 Dataset5Patch224px = Path("candolle_5patches_224px")
 Dataset5Patch = Path("candolle_5patch")
 tinyClipModels = Path("tinyClipModels")
-
+models_path = "Evaluation/models"
 hefFolder_path = "Evaluation/resources/hef" # get from for loop
 postprocess_path = "Evaluation/resources/json/gemm_layer_RN50x4.json"
 textEmbeddings_path = "Evaluation/resources/json/textEmbeddings_RN50x4.json"
 
-
 def main():
-    heffiles = next(os.walk(hefFolder_path), (None, None, []))[2] #Get files from hef dir
-    for hef in heffiles:
-        hef_path = hefFolder_path + "/" + hef
-        postprocess_path = getCorrespondingGemm(hef)
-        print(f"Gemm path:{postprocess_path}")
-        textEmbeddings_path = getCorrespondingTextEmb(hef)
-        print(f"Gemm path:{textEmbeddings_path}")
-        hailoImagemodel = HailoCLIPImage(hef_path,postprocess_path)
-        hailoTextmodel = HailoCLIPText(textEmbeddings_path)
-        modelname = hailoTextmodel.getModelName()
+    models_list = next(os.walk(models_path), (None, [], None))[1]
+    for model_folder in models_list:
+        folder_path = models_path + "/" + model_folder
+        gemm_path, hef_path, textemb_path, textemb5S_path = getModelfiles(folder_path)
+        print(f"Gemm path:{gemm_path}")
+        print(f"Emb path:{textemb_path}")
+        hailoImagemodel = HailoCLIPImage(hef_path,gemm_path)
+        hailoTextmodel = HailoCLIPText(textemb_path)
+        modelname = model_folder
         use5Scentens = hailoTextmodel.getuse5Scentens()
         accuracy_models = []
         

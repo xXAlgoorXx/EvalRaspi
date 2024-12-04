@@ -17,6 +17,34 @@ from torcheval.metrics import Throughput
 from os import walk
 from utils import loadJson,transform
 
+def getModelfiles(folder_path):
+    files = os.listdir(folder_path)
+    gemm_path = None
+    hef_path = None
+    textemb_path = None
+    textemb5S_path = None
+    for file in files:
+        stem = file.split("/")[-1]
+        
+        if stem.split(".")[-1] == "json":
+            filename = stem.split(".")[0]
+            if "gemmLayer" in filename:
+                gemm_path = folder_path + "/" + file
+                continue
+            
+            if "_5S" in filename:
+                textemb5S_path = folder_path + "/" + file
+                continue
+            
+            else:
+                textemb_path = folder_path + "/" + file
+                continue
+  
+        if stem.split(".")[-1] == "hef":
+            hef_path = folder_path + "/" + file
+            
+    return gemm_path, hef_path, textemb_path, textemb5S_path
+
 def getCorrespondingGemm(modelName):
     """
     Get gemm layer json path

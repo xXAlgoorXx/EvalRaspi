@@ -86,7 +86,7 @@ def get_pred_hailo(input_folder,hailoModelText,hailoModelImage,use5Scentens = Fa
     '''
     # List all files in the input folder
     files = os.listdir(input_folder)
-    # files = files[0:10]
+    files = files[0:100]
 
     in_list = []
     out_list = []
@@ -274,7 +274,7 @@ class HailoCLIPText:
         
         # Compute cosine similarity (scaled by 100)
         logits_per_image = 100.0 * (image_features @ text_features.T)
-        probs = logits_per_image.softmax(dim=-1).cpu().numpy()[np.newaxis,:] # new axis so its same out like CLIP
+        probs = logits_per_image.softmax(dim=-1).cpu().numpy()[np.newaxis,:] # new axis so its same output like CLIP
 
         # uncomment when processing 5 sentences
         if self.use5Scentens and level != 1:
@@ -299,6 +299,11 @@ class HailoCLIPImage:
         post_process = RestOfGraph(postprocessjson_path)
         self.postprocess = post_process
         
+    def onlyHEF(self,image):
+        result = self._run_inference(image)
+        result = np.array(list(result.values())[0]).squeeze()
+        return result
+        
     def encode_image(self,image):
         """
         Same like clip model:
@@ -306,14 +311,18 @@ class HailoCLIPImage:
         """
         result = self._run_inference(image)
         result = np.array(list(result.values())[0]).squeeze()
-        posP_image = self.postprocess(result)
         if self.isTinyClip:
-            posP_image = posP_image[0]
+            result = result[0,:]
+        posP_image = self.postprocess(result)
+        # if self.isTinyClip:
+        #     posP_image = posP_image[0,:]
         return posP_image
+    
+    #0.044740750767831294
     
     def performPostprocess(self,input):
         """
-        calculation of teh cut off graph
+        calculation of the cut off graph
         """
         return self.postprocess(input)
     
@@ -325,6 +334,9 @@ class HailoCLIPImage:
         return self.preprocess(input)
     
     def _run_inference(self,image):
+        """
+        Inferance code for Hailo
+        """
         # Setup device and configure model
         with VDevice() as device:
             
@@ -358,12 +370,10 @@ class HailoCLIPImage:
                     results = pipeline.infer({input_info.name: np.ascontiguousarray(dataset)})
                     return results
                       
-
 class RestOfGraph:
     """
     GemmLayer which got cut off
     """
-    
     def __init__(self,weightJson_path):
         self.json = loadJson(weightJson_path)
         self.bias = np.array(self.json["bias"])
@@ -380,6 +390,7 @@ if __name__ == "__main__":
     from PIL import Image
     import clip
     import torch
+    import open_clip
     
     def printEval(image_features, text_features):
         image_features = torch.Tensor(image_features)
@@ -393,36 +404,41 @@ if __name__ == "__main__":
         for value, index in zip(values, indices):
             print(f"{names2[index]:>16s}: {100 * value.item():.2f}%")
     
-    
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    gemmLayerjson_path = "Evaluation/resources/json/gemm_layer_RN50x4.json"
-    hef_path = 'Evaluation/resources/hef/Modified_RN50x4.hef'
-    onnx_path = "Evaluation/resources/onnx/modified_RN50x4_simple.onnx"
-    
+    gemmLayerjson_path = "Evaluation/models/TinyClip19M/gemmLayer_TinyCLIP-ResNet-19M.json"
+    hef_path = 'Evaluation/models/TinyClip19M/TinyCLIP-ResNet-19M.hef'
+    onnx_path = "Evaluation/models/TinyClip19M/TinyCLIP-ResNet-19M.onnx"
+    model_name = "TinyCLIP-ResNet-19M-Text-19M"
     hailoInference = HailoCLIPImage(hef_path,gemmLayerjson_path)
-    model, preprocess = clip.load("RN50x4", device=device)
+    model, preprocess_train, preprocess_val = open_clip.create_model_and_transforms(
+        model_name,
+        pretrained=f"tinyClipModels/{model_name}-LAION400M.pt"
+    )
+    
     names2 = ["architectural", "office", "residential", "school", "manufacturing",
               "cellar", "laboratory", "construction site", "mining", "tunnel"]
+    
     names2 = ["car","dog","cat","house","wrench","Blue"]
-     
+    
     # Example usage
     image_path = "Evaluation/testImg/pexels-mikebirdy-170811.jpg"
     image_pre = Image.open(image_path)
-    image = preprocess(image_pre).unsqueeze(0).to(device)
-    image = hailoInference.performPreprocess(image_pre).unsqueeze(0)
-    text_inputs = clip.tokenize(names2).to(device)
+    image = preprocess_val(image_pre).unsqueeze(0).to(device)
+    #image = hailoInference.performPreprocess(image_pre).unsqueeze(0)
+    tokenizer = open_clip.get_tokenizer(model_name)
+    text_inputs = tokenizer(names2).to(device)
      
-    #CLIP
+    # CLIP
     with torch.no_grad():
         imageEmb_clip = model.encode_image(image).detach().numpy().squeeze()
         text_features = model.encode_text(text_inputs)
     
-    #ONNX
+    # ONNX
     session = ort.InferenceSession(onnx_path)
-    imageEmb_onnx = session.run(None, {"onnx::Cast_0": image.numpy()})
-    imageEmb_onnx = hailoInference.performPostprocess(np.array(imageEmb_onnx).flatten())
+    imageEmb_onnx = np.array(session.run(None, {"input": image.numpy()})).squeeze()
+    #imageEmb_onnx = hailoInference.performPostprocess(np.array(imageEmb_onnx).flatten())
     
-    #HAILO
+    # HAILO
     imageEmb_hailo = hailoInference.encode_image(image)
     
     # Print results

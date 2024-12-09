@@ -20,6 +20,26 @@ import json
 
 IMAGE_EXTENSIONS: Tuple[str, ...] = ('.jpg', '.png', '.bmp', '.jpeg')
 
+class ThroughputMetric:
+    def __init__(self):
+        self.data = []
+
+    def update(self,num_processed, time):
+        """
+        iterations per second
+        """
+        self.data.append(num_processed / time)
+
+    def getMean(self):
+        return np.mean(self.data)
+
+    def getStd(self):
+        return np.std(self.data)
+
+    def compute(self):
+        return self.getMean(), self.getStd()
+
+
 def loadJson(path):
     # Open and read the JSON file
     with open(path, 'r') as file:

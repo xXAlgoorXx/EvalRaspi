@@ -16,18 +16,25 @@ postprocess_path = "Evaluation/resources/json/gemm_layer_RN50x4.json"
 textEmbeddings_path = "Evaluation/resources/json/textEmbeddings_RN50x4.json"
 
 def main():
+    throughput_model =[]
+    df_perf_acc = pd.DataFrame(columns=["Modelname"])
+    accuracy_models = []
+    
     models_list = next(os.walk(models_path), (None, [], None))[1]
+    # Only TinyClip
+    models_list = [model for model in models_list if "Tiny" in model]
     for model_folder in models_list:
         folder_path = models_path + "/" + model_folder
         gemm_path, hef_path, textemb_path, textemb5S_path = getModelfiles(folder_path)
+        modelname = model_folder
+        print(f"Model name:{modelname}")
         print(f"Gemm path:{gemm_path}")
         print(f"Emb path:{textemb_path}")
         hailoImagemodel = HailoCLIPImage(hef_path,gemm_path)
         hailoTextmodel = HailoCLIPText(textemb_path)
-        modelname = model_folder
-        use5Scentens = hailoTextmodel.getuse5Scentens()
-        accuracy_models = []
         
+        use5Scentens = hailoTextmodel.getuse5Scentens()
+
         # Path to csv
         if use5Scentens:
             csv_path_predictions = outputPath / f'pred_{modelname}_5patches_5scentens.csv'
@@ -89,9 +96,15 @@ def main():
         print(f'Accuracy: {accuracy:.3f}')
 
         printAndSaveHeatmap(df,modelname,outputPath,use5Scentens)
+        
+        throughput = get_throughput_hailo(Dataset5Patch,hailoModelImage=hailoImagemodel,hailoModelText=hailoTextmodel,use5Scentens = False)
+        throughput_model.append(throughput)
+        print(throughput_model)
+        df_perf_acc = df_perf_acc._append({
+            "Modelname": modelname,
+        }, ignore_index=True)
 
-    # Parameter Evaluation
-    df_perf_acc = pd.DataFrame(columns=["Modelname"])
+    
 
     if use5Scentens:
         csv_path_perforemance = outputPath / f'modelPerformance_5patches_5scentens.csv'
@@ -100,12 +113,6 @@ def main():
     
     accuracy_models = [ '%.3f' % elem for elem in accuracy_models ]
     df_perf_acc["Accuracy"] = accuracy_models
-
-    # Throughput evaluation
-    throughput_model =[]
-    throughput = get_throughput_hailo(Dataset5Patch,hailoModelImage=hailoImagemodel,hailoModelText=hailoTextmodel,use5Scentens = False)
-    throughput_model.append(throughput)
-    print(throughput_model)
     throughput_model = [ '%.2f' % elem for elem in throughput_model ]
     df_perf_acc["Throughput"] = throughput_model
     df_perf_acc.to_csv(csv_path_perforemance, index=False)

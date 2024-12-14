@@ -15,7 +15,7 @@ from PIL import Image
 import torch
 from torcheval.metrics import Throughput
 from os import walk
-from utils import loadJson,transform
+from utils import loadJson,transform,ThroughputMetric
 
 def getModelfiles(folder_path):
     files = os.listdir(folder_path)
@@ -86,7 +86,7 @@ def get_pred_hailo(input_folder,hailoModelText,hailoModelImage,use5Scentens = Fa
     '''
     # List all files in the input folder
     files = os.listdir(input_folder)
-    files = files[0:100]
+    files = files
 
     in_list = []
     out_list = []
@@ -143,7 +143,7 @@ def get_throughput_hailo(input_folder,hailoModelText,hailoModelImage,use5Scenten
     In: path of the image folder, tokenized text prompts 
     Out: dataframe with the probability scores for each image
     '''
-    metric = Throughput()
+    metric = ThroughputMetric()
     # List all files in the input folder
     files = os.listdir(input_folder)
 
@@ -183,6 +183,51 @@ def evalModel_hailo(model_i,model_t,image,level,use_5_Scentens = False):
     
     # Encode image and text features separately
     image_features = model_i.encode_image(image)
+    text_features = model_t.encode_text(level,use_5_Scentens)
+    probs = model_t.clalcProbs(image_features,text_features,level)
+
+    return probs
+
+def get_throughput_hailo_image(input_folder,hailoModelText,hailoModelImage,use5Scentens = False):
+    '''
+    Function that calculates the probability that each image belongs to each class
+    In: path of the image folder, tokenized text prompts 
+    Out: dataframe with the probability scores for each image
+    '''
+    metric = ThroughputMetric()
+    # List all files in the input folder
+    files = os.listdir(input_folder)
+
+    # use less files for faster computing
+    files = files[0:100]
+
+    # Loop through each file
+    for file in tqdm(files, desc="Files", position=1):
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        
+        # Read the image
+        image_path = os.path.join(input_folder, file)
+        image = hailoModelImage.performPreprocess(Image.open(image_path)).unsqueeze(0)
+
+        ### FIRST DEGREE ###
+        probs = evalModel_hailo_image(hailoModelImage,hailoModelText,image,1,metric)
+
+        ### SECOND DEGREE (in) ###
+        probs = evalModel_hailo_image(hailoModelImage,hailoModelText,image,2,metric)
+
+        ### SECOND DEGREE (out) ###
+        probs = evalModel_hailo_image(hailoModelImage,hailoModelText,image,3,metric)
+    
+    return metric.compute()
+
+
+def evalModel_hailo_image(model_i,model_t,image,level,metric,use_5_Scentens = False):
+    
+    # Encode image and text features separately
+    ts = time.monotonic()
+    image_features = model_i.encode_image(image)
+    elapsed_time = time.monotonic() - ts
+    metric.update(1, elapsed_time)
     text_features = model_t.encode_text(level,use_5_Scentens)
     probs = model_t.clalcProbs(image_features,text_features,level)
 
@@ -314,11 +359,7 @@ class HailoCLIPImage:
         if self.isTinyClip:
             result = result[0,:]
         posP_image = self.postprocess(result)
-        # if self.isTinyClip:
-        #     posP_image = posP_image[0,:]
         return posP_image
-    
-    #0.044740750767831294
     
     def performPostprocess(self,input):
         """
@@ -369,7 +410,8 @@ class HailoCLIPImage:
                 with InferVStreams(network_group, input_params, output_params) as pipeline:
                     results = pipeline.infer({input_info.name: np.ascontiguousarray(dataset)})
                     return results
-                      
+
+      
 class RestOfGraph:
     """
     GemmLayer which got cut off
@@ -383,7 +425,6 @@ class RestOfGraph:
         # input = np.array(list(input.values())[0]).squeeze()
         result = np.dot(input, self.weight.T) + self.bias
         return result
-
 
 
 if __name__ == "__main__":

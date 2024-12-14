@@ -9,3 +9,4 @@ build
 *.jpg
 *.hef
 *.onnx
+*.csv

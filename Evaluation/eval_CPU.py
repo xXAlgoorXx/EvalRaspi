@@ -6,10 +6,11 @@ from pathlib import Path
 import clip
 import open_clip
 import torch
-from Evaluation.cpuEval_utils import get_throughput,get_pred,get_max_class_with_threshold,get_trueClass,find_majority_element,printAndSaveHeatmap
+from utils import printAndSaveClassReport,printClassificationReport,get_max_class_with_threshold,get_trueClass,find_majority_element,printAndSaveHeatmap
+from cpuEval_utils import get_throughput,get_pred,get_throughput_image
 
 # Pathes
-outputPath = Path("Evaluation/Data")
+outputPath = Path("Evaluation/Data/CPU")
 Dataset5Patch224px = Path("candolle_5patches_224px")
 Dataset5Patch = Path("candolle_5patch")
 tinyClipModels = Path("tinyClipModels")
@@ -91,7 +92,7 @@ def  main():
             df_pred.to_csv(csv_path_predictions, index=False)
             df_5patch = get_trueClass(pd.read_csv(csv_path_predictions))
         df = df_5patch.copy()
-        df['y_predIO'] = df.apply(get_max_class_with_threshold, axis=1, threshold=0.8)
+        df['y_predIO'] = df.apply(get_max_class_with_threshold, axis=1, threshold=0.75)
 
         # set the outdoor classes to 0 when the image was classified as indoor 
         # set the indoor classes to 0 when the image was classified as outdoor 
@@ -139,6 +140,12 @@ def  main():
         print(f'Accuracy: {accuracy:.3f}')
 
         printAndSaveHeatmap(df,modelname,outputPath,use5Scentens)
+        
+        # Classification Report (Bar plot)
+        classificationReport = printClassificationReport(df, modelname)
+        del classificationReport['accuracy']
+        df_classReport = pd.DataFrame.from_dict(classificationReport,orient='index')
+        printAndSaveClassReport(classificationReport,modelname,outputPath)
 
     # Parameter Evaluation
     df_perf_acc = pd.DataFrame(columns=["Modelname","Params Vis","Params Text"])
@@ -167,18 +174,23 @@ def  main():
     df_perf_acc["Accuracy"] = accuracy_models
 
     # Throughput evaluation
-    throughput_model =[]
-    for i,modelname in enumerate(tqdm(resnetModels,position=0,desc="Params")):
+    throughput_model_mean = []
+    throughput_model_std = []
+    throughput_model_mean_image = []
+    throughput_model_std_image = []
+    for i, modelname in enumerate(tqdm(resnetModels, position=0, desc="Params")):
         try:
             if os.path.exists(tinyClipModels / f"modelname"):
                 print(f"Model {modelname} available")
-            model,_, preprocess = open_clip.create_model_and_transforms(modelname, device=device,pretrained=str(tinyClipModels / f"{modelname}-LAION400M.pt"))
+            model, _, preprocess = open_clip.create_model_and_transforms(
+                modelname, device=device, pretrained=str(tinyClipModels / f"{modelname}-LAION400M.pt"))
 
             # tokenize text prompts
             openClipTokenizer = open_clip.get_tokenizer(modelname)
             text1 = openClipTokenizer(["indoor", "outdoor"]).to(device)
             text2 = openClipTokenizer(names2).to(device)
             text3 = openClipTokenizer(names3).to(device)
+
         except:
             model, preprocess = clip.load(modelname, device=device)
 
@@ -186,11 +198,25 @@ def  main():
             text1 = clip.tokenize(["indoor", "outdoor"]).to(device)
             text2 = clip.tokenize(names2).to(device)
             text3 = clip.tokenize(names3).to(device)
-        throughput = get_throughput(Dataset5Patch, text1, text2, text3,preprocess,model)
-        throughput_model.append(throughput)
-        print(throughput_model)
-    throughput_model = [ '%.2f' % elem for elem in throughput_model ]
-    df_perf_acc["Throughput"] = throughput_model
+        throughput_mean,throughput_std = get_throughput(
+            Dataset5Patch, text1, text2, text3, preprocess, model)
+        throughput_model_mean.append(throughput_mean)
+        throughput_model_std.append(throughput_std)
+        print(f"\nThrouputs: {throughput_model_mean}")
+        
+        throughput_mean_image,throughput_std_image = get_throughput_image(
+            Dataset5Patch, text1, text2, text3, preprocess, model)
+        throughput_model_mean_image.append(throughput_mean_image)
+        throughput_model_std_image.append(throughput_std_image)
+        print(f"\nThrouputs Image: {throughput_model_mean_image}")
+
+    throughput_model_mean = ['%.2f' % elem for elem in throughput_model_mean]
+    throughput_model_mean_image = ['%.2f' % elem for elem in throughput_model_mean_image]
+    
+    df_perf_acc["Throughput (it/s)"] = throughput_model_mean
+    df_perf_acc["Throughput Image (it/s)"] = throughput_model_mean_image
+    df_perf_acc["Throughput std"] = throughput_model_std
+    df_perf_acc["Throughput Image std"] = throughput_model_std_image
     df_perf_acc.to_csv(csv_path_perforemance, index=False)
 
 if __name__ == "__main__":

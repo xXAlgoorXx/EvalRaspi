@@ -30,85 +30,85 @@ def get_modelnames():
     return resnetModels
 
 
-def get_pred2(input_folder, text1, text2, text3, preprocess, model, use5Scentens=False):
-    '''
-    Function that calculates the probability that each image belongs to each class
-    In: path of the image folder, tokenized text prompts 
-    Out: dataframe with the probability scores for each image
-    '''
-    model.eval()
-    # List all files in the input folder
-    files = os.listdir(input_folder)
-    text = torch.cat((text1, text2, text3), 0)
-    startNames2 = len(text1)
-    startNames3 = len(text1) + len(text2)
-    in_list = []
-    out_list = []
-    in_arch_list = []
-    in_constr_list = []
-    out_constr_list = []
-    out_urb_list = []
-    out_for_list = []
-    scene_list = []
-    img_list = []
-    # Loop through each file
-    for file in tqdm(files, desc="Files", position=1):
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-        # Read the image
-        image_path = os.path.join(input_folder, file)
-        image = preprocess(Image.open(image_path)).unsqueeze(0).to(device)
-        ts = time.monotonic()
+# def get_pred2(input_folder, text1, text2, text3, preprocess, model, use5Scentens=False):
+#     '''
+#     Function that calculates the probability that each image belongs to each class
+#     In: path of the image folder, tokenized text prompts 
+#     Out: dataframe with the probability scores for each image
+#     '''
+#     model.eval()
+#     # List all files in the input folder
+#     files = os.listdir(input_folder)
+#     text = torch.cat((text1, text2, text3), 0)
+#     startNames2 = len(text1)
+#     startNames3 = len(text1) + len(text2)
+#     in_list = []
+#     out_list = []
+#     in_arch_list = []
+#     in_constr_list = []
+#     out_constr_list = []
+#     out_urb_list = []
+#     out_for_list = []
+#     scene_list = []
+#     img_list = []
+#     # Loop through each file
+#     for file in tqdm(files, desc="Files", position=1):
+#         device = "cuda" if torch.cuda.is_available() else "cpu"
+#         # Read the image
+#         image_path = os.path.join(input_folder, file)
+#         image = preprocess(Image.open(image_path)).unsqueeze(0).to(device)
+#         ts = time.monotonic()
 
-        probs = evalModel(model, image, text, False)
+#         probs = evalModel(model, image, text, False)
 
-        score_in = probs[0][0]
+#         score_in = probs[0][0]
 
-        score_out = probs[0][1]
+#         score_out = probs[0][1]
 
-        score_in_arch = (probs[0][startNames2 + 0]
-                         + probs[0][startNames2 + 1]
-                         + probs[0][startNames2 + 2]
-                         + probs[0][startNames2 + 3]
-                         + probs[0][startNames2 + 4]
-                         + probs[0][startNames2 + 5]
-                         + probs[0][startNames2 + 6])
+#         score_in_arch = (probs[0][startNames2 + 0]
+#                          + probs[0][startNames2 + 1]
+#                          + probs[0][startNames2 + 2]
+#                          + probs[0][startNames2 + 3]
+#                          + probs[0][startNames2 + 4]
+#                          + probs[0][startNames2 + 5]
+#                          + probs[0][startNames2 + 6])
 
-        score_in_constr = (probs[0][startNames2 + 7]
-                           + probs[0][startNames2 + 8]
-                           + probs[0][startNames2 + 9])
+#         score_in_constr = (probs[0][startNames2 + 7]
+#                            + probs[0][startNames2 + 8]
+#                            + probs[0][startNames2 + 9])
 
-        score_out_constr = probs[0][startNames3]
+#         score_out_constr = probs[0][startNames3]
 
-        score_out_urb = (probs[0][startNames3 + 1]
-                         + probs[0][startNames3 + 2]
-                         + probs[0][startNames3 + 3]
-                         + probs[0][startNames3 + 4]
-                         + probs[0][startNames3 + 5])
+#         score_out_urb = (probs[0][startNames3 + 1]
+#                          + probs[0][startNames3 + 2]
+#                          + probs[0][startNames3 + 3]
+#                          + probs[0][startNames3 + 4]
+#                          + probs[0][startNames3 + 5])
 
-        score_out_for = probs[0][startNames3 + 6]
+#         score_out_for = probs[0][startNames3 + 6]
 
-        in_list.append(score_in)
-        out_list.append(score_out)
-        in_arch_list.append(score_in_arch)
-        in_constr_list.append(score_in_constr)
-        out_constr_list.append(score_out_constr)
-        out_urb_list.append(score_out_urb)
-        out_for_list.append(score_out_for)
-        scene_list.append(int(os.path.basename(
-            file).split('.')[0].split('_')[1]))
-        img_list.append(int(os.path.basename(
-            file).split('.')[0].split('_')[2]))
+#         in_list.append(score_in)
+#         out_list.append(score_out)
+#         in_arch_list.append(score_in_arch)
+#         in_constr_list.append(score_in_constr)
+#         out_constr_list.append(score_out_constr)
+#         out_urb_list.append(score_out_urb)
+#         out_for_list.append(score_out_for)
+#         scene_list.append(int(os.path.basename(
+#             file).split('.')[0].split('_')[1]))
+#         img_list.append(int(os.path.basename(
+#             file).split('.')[0].split('_')[2]))
 
-    df_pred = pd.DataFrame({'Scene': scene_list,
-                            'Image': img_list,
-                            'In_Arch': in_arch_list,
-                            'In_Constr': in_constr_list,
-                            'Out_Constr': out_constr_list,
-                            'Out_Urban': out_urb_list,
-                            'Forest': out_for_list,
-                            'In': in_list,
-                            'Out': out_list})
-    return df_pred
+#     df_pred = pd.DataFrame({'Scene': scene_list,
+#                             'Image': img_list,
+#                             'In_Arch': in_arch_list,
+#                             'In_Constr': in_constr_list,
+#                             'Out_Constr': out_constr_list,
+#                             'Out_Urban': out_urb_list,
+#                             'Forest': out_for_list,
+#                             'In': in_list,
+#                             'Out': out_list})
+#     return df_pred
 
 
 def get_pred(input_folder, text1, text2, text3, preprocess, model, use5Scentens=False):

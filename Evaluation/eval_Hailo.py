@@ -3,7 +3,7 @@ import pandas as pd
 from sklearn.metrics import accuracy_score
 from pathlib import Path
 from utils import printAndSaveClassReport,printClassificationReport,get_max_class_with_threshold,get_trueClass,find_majority_element,printAndSaveHeatmap
-from hailoEval_utils import get_pred_hailo,get_throughput_hailo, HailoCLIPImage, HailoCLIPText,getModelfiles,get_throughput_hailo_image
+from hailoEval_utils import get_pred_hailo,get_throughput_hailo, HailoCLIPImage, HailoCLIPText,getModelfiles,get_throughput_hailo_image,HailofastCLIPImage
 
 # Pathes
 outputPath = Path("Evaluation/Data/Hailo")
@@ -16,7 +16,7 @@ postprocess_path = "Evaluation/resources/json/gemm_layer_RN50x4.json"
 textEmbeddings_path = "Evaluation/resources/json/textEmbeddings_RN50x4.json"
 
 def main():
-    modelTh_dict = {'RN50':0.6, 'RN50X4':0.77, 'TinyClip19M':0.45, 'RN101':0.87, 'TinyClip30M':0.4}
+    InOutTh_dict = {'RN50':0.6, 'RN50x4':0.77, 'TinyClip19M':0.45, 'RN101':0.87, 'TinyClip30M':0.4,'TinyClip19M16Bit':0.45}
     df_perf_acc = pd.DataFrame(columns=["Modelname"])
     accuracy_models = []
     
@@ -28,16 +28,23 @@ def main():
     
     models_list = next(os.walk(models_path), (None, [], None))[1]
     # Only TinyClip
-    # models_list = [model for model in models_list if "Tiny" in model]
+    models_list = [model for model in models_list if "Tiny" in model]
     for model_folder in models_list:
         folder_path = models_path + "/" + model_folder
-        gemm_path, hef_path, textemb_path, textemb5S_path = getModelfiles(folder_path)
+        gemm_path, hef_path, textemb_path, textemb5S_path, OnnxPostp_path = getModelfiles(folder_path)
+        
+        # set text embeddings and post process
+        textEmb = textemb5S_path
+        postP = OnnxPostp_path
         modelname = model_folder
         print(f"Model name:{modelname}")
-        print(f"Gemm path:{gemm_path}")
-        print(f"Emb path:{textemb_path}")
-        hailoImagemodel = HailoCLIPImage(hef_path,gemm_path)
-        hailoTextmodel = HailoCLIPText(textemb_path)
+        print(f"Postprocess path:{postP}")
+        print(f"Emb path:{textEmb}")
+        
+        hailoImagemodel = HailofastCLIPImage(hef_path, postP)
+        # hailoImagemodel = HailofastCLIPImage(hef_path, gemm_path)
+        hailoTextmodel = HailoCLIPText(textEmb)
+        
         
         use5Scentens = hailoTextmodel.getuse5Scentens()
 
@@ -55,7 +62,7 @@ def main():
             df_pred.to_csv(csv_path_predictions, index=False)
             df_5patch = get_trueClass(pd.read_csv(csv_path_predictions))
         df = df_5patch.copy()
-        threshold = modelTh_dict[modelname]
+        threshold = InOutTh_dict[modelname]
         df['y_predIO'] = df.apply(get_max_class_with_threshold, axis=1, threshold=threshold)
 
         # set the outdoor classes to 0 when the image was classified as indoor 
@@ -94,7 +101,7 @@ def main():
             "Out_Constr": "Out",
             "Out_Urban": "Out"
         }
-
+        
         IO_pred = [replacements.get(item, item) for item in majority_pred]
         IO_true = [replacements.get(item, item) for item in y_test_s]
 
@@ -129,11 +136,13 @@ def main():
         throughput_model_mean_image.append(throughput_mean_image)
         throughput_model_std_image.append(throughput_std_image)
         print(f"\nThrouputs Image: {throughput_model_mean_image}")
-    
+        
+        del hailoImagemodel
+        
         df_perf_acc = df_perf_acc._append({
             "Modelname": modelname,
         }, ignore_index=True)
-
+        
     if use5Scentens:
         csv_path_perforemance = outputPath / f'modelPerformance_5patches_5scentens.csv'
     else:

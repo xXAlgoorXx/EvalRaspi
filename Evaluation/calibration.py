@@ -355,12 +355,13 @@ def main():
     for model_folder in models_list:
         folder_path = models_path + "/" + model_folder
         gemm_path, hef_path, textemb_path, textemb5S_path,OnnxPostp_path = getModelfiles(folder_path)
+        emb_path = textemb5S_path
         modelname = model_folder
         print(f"Model name:{modelname}")
         print(f"Gemm path:{OnnxPostp_path}")
-        print(f"Emb path:{textemb_path}")
+        print(f"Emb path:{emb_path}")
         hailoImagemodel = HailofastCLIPImage(hef_path,OnnxPostp_path)
-        hailoTextmodel = HailoCLIPText(textemb_path)
+        hailoTextmodel = HailoCLIPText(emb_path)
         
         use5Scentens = hailoTextmodel.getuse5Scentens()
 

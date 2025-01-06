@@ -57,7 +57,7 @@ def main():
         # check if csv already exists
         if os.path.exists(csv_path_predictions):
             df_5patch = get_trueClass(pd.read_csv(csv_path_predictions))
-        else:                
+        else:
             df_pred = get_pred_hailo(Dataset5Patch,hailoModelImage=hailoImagemodel,hailoModelText=hailoTextmodel,use5Scentens = False)
             df_pred.to_csv(csv_path_predictions, index=False)
             df_5patch = get_trueClass(pd.read_csv(csv_path_predictions))

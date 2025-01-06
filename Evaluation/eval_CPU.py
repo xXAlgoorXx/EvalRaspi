@@ -17,7 +17,7 @@ tinyClipModels = Path("tinyClipModels")
 
 def  main():
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    use5Scentens = False
+    use5Scentens = True
     ## From Lia
     # define text prompts
     names2 = ["architectural","office", "residential", "school", "manufacturing",  "cellar", "laboratory","construction site", "mining", "tunnel"]

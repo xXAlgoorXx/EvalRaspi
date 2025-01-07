@@ -1,25 +1,27 @@
 import os
 import pandas as pd
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score,balanced_accuracy_score
 from pathlib import Path
 from utils import printAndSaveClassReport,printClassificationReport,get_max_class_with_threshold,get_trueClass,find_majority_element,printAndSaveHeatmap
 from hailoEval_utils import get_pred_hailo,get_throughput_hailo, HailoCLIPImage, HailoCLIPText,getModelfiles,get_throughput_hailo_image,HailofastCLIPImage
 
 # Pathes
-outputPath = Path("Evaluation/Data/Hailo")
+outputPath = Path("Evaluation/Data/HailoCut")
 Dataset5Patch224px = Path("candolle_5patches_224px")
 Dataset5Patch = Path("candolle_5patch")
 tinyClipModels = Path("tinyClipModels")
-models_path = "Evaluation/models"
+models_path = "Evaluation/modelscut"
 hefFolder_path = "Evaluation/resources/hef" # get from for loop
 postprocess_path = "Evaluation/resources/json/gemm_layer_RN50x4.json"
 textEmbeddings_path = "Evaluation/resources/json/textEmbeddings_RN50x4.json"
 
 def main():
     InOutTh_dict = {'RN50':0.6, 'RN50x4':0.77, 'TinyClip19M':0.45, 'RN101':0.87, 'TinyClip30M':0.4,'TinyClip19M16Bit':0.45}
+    InOutTh_dict = {'RN50':0.5, 'RN50x4':0.5, 'TinyClip19M':0.5, 'RN101':0.5, 'TinyClip30M':0.5, 'TinyClip19M16Bit':0.5}
     df_perf_acc = pd.DataFrame(columns=["Modelname"])
     accuracy_models = []
-    
+    balanced_accuracy_models = []
+        
     # Throughput evaluation
     throughput_model_mean = []
     throughput_model_std = []
@@ -28,7 +30,7 @@ def main():
     
     models_list = next(os.walk(models_path), (None, [], None))[1]
     # Only TinyClip
-    models_list = [model for model in models_list if "Tiny" in model]
+    # models_list = [model for model in models_list if "Tiny" in model]
     for model_folder in models_list:
         folder_path = models_path + "/" + model_folder
         gemm_path, hef_path, textemb_path, textemb5S_path, OnnxPostp_path = getModelfiles(folder_path)
@@ -106,9 +108,12 @@ def main():
         IO_true = [replacements.get(item, item) for item in y_test_s]
 
         
-        accuracy = accuracy_score(IO_true, IO_pred)
+        balanced_accuracy = balanced_accuracy_score(IO_true, IO_pred)
+        accuracy = accuracy_score(y_test, y_pred)
         accuracy_models.append(accuracy)
+        balanced_accuracy_models.append(balanced_accuracy)
         print(f'Accuracy: {accuracy:.3f}')
+        print(f'Balanced accuracy: {balanced_accuracy:.3f}')
 
         # Heatmap
         printAndSaveHeatmap(df,modelname,outputPath,use5Scentens)
@@ -152,7 +157,9 @@ def main():
     throughput_model_mean_image = ['%.2f' % elem for elem in throughput_model_mean_image]
     
     accuracy_models = [ '%.3f' % elem for elem in accuracy_models ]
+    balanced_accuracy_models = [ '%.3f' % elem for elem in balanced_accuracy_models ]
     df_perf_acc["Accuracy"] = accuracy_models
+    df_perf_acc["Balanced accuracy"] = balanced_accuracy_models
     df_perf_acc["Throughput (it/s)"] = throughput_model_mean
     df_perf_acc["Throughput Image (it/s)"] = throughput_model_mean_image
     df_perf_acc["Throughput std"] = throughput_model_std

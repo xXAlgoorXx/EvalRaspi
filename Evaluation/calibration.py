@@ -311,24 +311,23 @@ def get_max_class_with_threshold_outdoor(row, threshold):
         else:
             return "Out_Constr"
             
-    # Check
-    if Forest_prob > threshold:
-        return "Forest"
-    elif Out_Constr_prob > Out_Urban_prob:
-        return "Out_Constr"
-    else:
-        return "Out_Urban"
+    # # Check
+    # if Forest_prob > threshold:
+    #     return "Forest"
+    # elif Out_Constr_prob > Out_Urban_prob:
+    #     return "Out_Constr"
+    # else:
+    #     return "Out_Urban"
     
-    # Check which probability is above the threshold and return the corresponding class
-    if Out_Constr_prob > threshold and Out_Constr_prob >= max(Out_Urban_prob, Forest_prob):
-        return "Out_Constr"
-    elif Out_Urban_prob > threshold and Out_Urban_prob >= max(Out_Constr_prob, Forest_prob):
-        return "Out_Urban"
-    elif Forest_prob > threshold:
-        return "Forest"
-    else:
-        return "Below_Threshold"
-
+    # # Check which probability is above the threshold and return the corresponding class
+    # if Out_Constr_prob > threshold and Out_Constr_prob >= max(Out_Urban_prob, Forest_prob):
+    #     return "Out_Constr"
+    # elif Out_Urban_prob > threshold and Out_Urban_prob >= max(Out_Constr_prob, Forest_prob):
+    #     return "Out_Urban"
+    # elif Forest_prob > threshold:
+    #     return "Forest"
+    # else:
+    #     return "Below_Threshold"
 
 def main():
     models_list = next(os.walk(models_path), (None, [], None))[1]
@@ -350,8 +349,8 @@ def main():
     outdoor_out_forest = calibData["out_forest"]
     outdoorData = np.array(outdoor_out_urb+outdoor_out_constr+outdoor_out_forest).flatten()
     
-    # Only TinyClip
-    models_list = [model for model in models_list if "Tiny" in model]
+    
+    # models_list = [model for model in models_list if "Tiny" in model]
     for model_folder in models_list:
         folder_path = models_path + "/" + model_folder
         gemm_path, hef_path, textemb_path, textemb5S_path,OnnxPostp_path = getModelfiles(folder_path)
@@ -384,17 +383,17 @@ def main():
         # Indoor / Outdoor
         df = df_calibAll.copy()
         maxThdict_all = getMaxThresholdInOut(df)
-        printAndSaveTh(maxThdict_all,modelname,outputPath_InOut,"InOut")
+        printAndSaveTh(maxThdict_all,modelname,outputPath_InOut,"InOut",use_5_Scentens = use5Scentens)
         
         # Indoor
         df = df_calibIn.copy()
         maxThdict_in = getMaxThresholdIndoor(df)
-        printAndSaveTh(maxThdict_in,modelname,outputPath_Indoor,"Indoor")
+        printAndSaveTh(maxThdict_in,modelname,outputPath_Indoor,"Indoor",use_5_Scentens = use5Scentens)
         
         # Outdoor       
         df = df_calibOut.copy()
         maxThdict_out = getMaxThresholdOutdoor(df)
-        printAndSaveTh(maxThdict_out,modelname,outputPath_Outdoor,"Outdoor")
+        printAndSaveTh(maxThdict_out,modelname,outputPath_Outdoor,"Outdoor",use_5_Scentens = use5Scentens)
 
 
 if __name__ == "__main__":

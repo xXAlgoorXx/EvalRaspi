@@ -19,6 +19,7 @@ from os import walk
 from utils import loadJson,transform,ThroughputMetric
 from typing import List, Generator, Optional, Tuple, Dict
 import queue
+import onnx
 
 def getModelfiles(folder_path):
     files = os.listdir(folder_path)
@@ -665,12 +666,20 @@ class RestOfGraphOnnx:
     """
     def __init__(self,onnx_path):
         self.session = ort.InferenceSession(onnx_path)
+        model = onnx.load(onnx_path)
+        output =[node.name for node in model.graph.output]
+
+        self.input_name = [node.name for node in model.graph.input][0]
+        
+        print('Inputs: ', self.input_name)
         
     def __call__(self,input):
         # input = np.array(list(input.values())[0]).squeeze()
         if input.ndim == 1:
             input = input[np.newaxis,:]
-        result = self.session.run(None, {"/attnpool/Reshape_7_output_0": input})
+        elif input.ndim == 2:
+            input = input[:,np.newaxis,:]
+        result = self.session.run(None, {self.input_name: input})
         result = np.array(result).squeeze(0)
         return result
 

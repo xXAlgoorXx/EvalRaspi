@@ -6,18 +6,15 @@ from utils import printAndSaveClassReport,printClassificationReport,get_max_clas
 from hailoEval_utils import get_pred_hailo,get_throughput_hailo, HailoCLIPImage, HailoCLIPText,getModelfiles,get_throughput_hailo_image,HailofastCLIPImage
 
 # Pathes
-outputPath = Path("Evaluation/Data/HailoCut")
+outputPath = Path("Evaluation/Data/HailoCutThused")
 Dataset5Patch224px = Path("candolle_5patches_224px")
 Dataset5Patch = Path("candolle_5patch")
 tinyClipModels = Path("tinyClipModels")
 models_path = "Evaluation/modelscut"
-hefFolder_path = "Evaluation/resources/hef" # get from for loop
-postprocess_path = "Evaluation/resources/json/gemm_layer_RN50x4.json"
-textEmbeddings_path = "Evaluation/resources/json/textEmbeddings_RN50x4.json"
 
 def main():
-    InOutTh_dict = {'RN50':0.6, 'RN50x4':0.77, 'TinyClip19M':0.45, 'RN101':0.87, 'TinyClip30M':0.4,'TinyClip19M16Bit':0.45}
-    InOutTh_dict = {'RN50':0.5, 'RN50x4':0.5, 'TinyClip19M':0.5, 'RN101':0.5, 'TinyClip30M':0.5, 'TinyClip19M16Bit':0.5}
+    InOutTh_dict = {'RN50':0.63, 'RN50x4':0.52, 'TinyClip19M':0.51, 'RN101':0.78, 'TinyClip30M':0.72,'TinyClip19M16Bit':0.45}
+    # InOutTh_dict = {'RN50':0.5, 'RN50x4':0.5, 'TinyClip19M':0.5, 'RN101':0.5, 'TinyClip30M':0.5, 'TinyClip19M16Bit':0.5}
     df_perf_acc = pd.DataFrame(columns=["Modelname"])
     accuracy_models = []
     balanced_accuracy_models = []
@@ -75,6 +72,7 @@ def main():
         # create the new column y_predIO
         columns = ['In_Arch', 'In_Constr', 'Out_Constr', 'Out_Urban', 'Forest']
         df['y_pred'] = df[columns].idxmax(axis=1)
+        
 
         # evaluate performance of model
         y_test = df['ClassTrue']
@@ -138,11 +136,14 @@ def main():
         print(f"\nThrouputs: {throughput_model_mean}")
         
         throughput_mean_image,throughput_std_image = get_throughput_hailo_image(Dataset5Patch,hailoModelImage=hailoImagemodel,hailoModelText=hailoTextmodel,use5Scentens = False)
+        
+        # Free device as early as possible
+        del hailoImagemodel
         throughput_model_mean_image.append(throughput_mean_image)
         throughput_model_std_image.append(throughput_std_image)
         print(f"\nThrouputs Image: {throughput_model_mean_image}")
         
-        del hailoImagemodel
+        
         
         df_perf_acc = df_perf_acc._append({
             "Modelname": modelname,

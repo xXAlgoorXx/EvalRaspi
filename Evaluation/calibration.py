@@ -11,6 +11,64 @@ from utils import loadJson,saveJson
 from hailoEval_utils import get_pred_hailo,evalModel_hailo, HailoCLIPImage, HailoCLIPText, getCorrespondingGemm, getCorrespondingTextEmb, getModelfiles,HailofastCLIPImage
 from utils import get_max_class_with_threshold,get_trueClass,find_majority_element,printAndSaveHeatmap
 
+def getMaxThresholdInOut2(df_5patch):
+    step = 0.01
+    th_list = np.arange(0.0,1.0 + step,step)
+    th_dict = {}
+    for th in th_list:
+        df = df_5patch.copy()
+        df['y_predIO'] = df.apply(get_max_class_with_threshold, axis=1, threshold=th)
+
+        # set the outdoor classes to 0 when the image was classified as indoor 
+        # set the indoor classes to 0 when the image was classified as outdoor 
+        df.loc[df['y_predIO'] == 'In', ['Out_Constr', 'Out_Urban', 'Forest']] = 0 
+        df.loc[df['y_predIO'] == 'Out', ['In_Arch', 'In_Constr']] = 0
+
+        # create the new column y_predIO
+        columns = ['In_Arch', 'In_Constr', 'Out_Constr', 'Out_Urban', 'Forest']
+        df['y_pred'] = df[columns].idxmax(axis=1)
+
+        # evaluate performance of model
+        y_test = df['ClassTrue']
+        y_pred = df['y_pred']
+
+        # majority counts
+        y_test_s = []
+        majority_pred = []
+
+        # # iterate through the input array in chunks of 5
+        # for i in range(0, len(y_test), 5):
+
+        #     patches = y_test[i:i+5]
+        #     majority_element = find_majority_element(patches)
+        #     y_test_s.append(majority_element)
+
+        #     patches = y_pred[i:i+5]
+        #     majority_element = find_majority_element(patches)
+        #     majority_pred.append(majority_element)
+
+        # # majority counts
+        # y_test_s = y_test
+        # majority_pred = y_pred
+
+        
+        # # conpute indoor/outdoor classification accuracy score
+        # replacements = {
+        #     "In_Arch": "In",
+        #     "In_Constr": "In",
+        #     "Forest": "Out",
+        #     "Out_Constr": "Out",
+        #     "Out_Urban": "Out"
+        # }
+
+        # IO_pred = [replacements.get(item, item) for item in majority_pred]
+        # IO_true = [replacements.get(item, item) for item in y_test_s]
+
+        # accuracy = accuracy_score(IO_true, IO_pred)
+        accuracy = accuracy_score(y_test, y_pred)
+        th_dict[th] = accuracy
+        
+    return th_dict
 
 
 def getMaxThresholdInOut(df_5patch):
@@ -310,24 +368,6 @@ def get_max_class_with_threshold_outdoor(row, threshold):
             return "Forest"
         else:
             return "Out_Constr"
-            
-    # # Check
-    # if Forest_prob > threshold:
-    #     return "Forest"
-    # elif Out_Constr_prob > Out_Urban_prob:
-    #     return "Out_Constr"
-    # else:
-    #     return "Out_Urban"
-    
-    # # Check which probability is above the threshold and return the corresponding class
-    # if Out_Constr_prob > threshold and Out_Constr_prob >= max(Out_Urban_prob, Forest_prob):
-    #     return "Out_Constr"
-    # elif Out_Urban_prob > threshold and Out_Urban_prob >= max(Out_Constr_prob, Forest_prob):
-    #     return "Out_Urban"
-    # elif Forest_prob > threshold:
-    #     return "Forest"
-    # else:
-    #     return "Below_Threshold"
 
 def main():
     models_list = next(os.walk(models_path), (None, [], None))[1]
@@ -398,16 +438,13 @@ def main():
 
 if __name__ == "__main__":
     # Pathes
-    outputPath_InOut = Path("Evaluation/Data/Hailo/calibration/Indoor_outdoor")
-    outputPath_Indoor = Path("Evaluation/Data/Hailo/calibration/Indoor")
-    outputPath_Outdoor = Path("Evaluation/Data/Hailo/calibration/Outdoor")
     Dataset5Patch224px = Path("candolle_5patches_224px")
     Dataset5Patch = Path("candolle_5patch")
     tinyClipModels = Path("tinyClipModels")
-    models_path = "Evaluation/models"
-    hefFolder_path = "Evaluation/resources/hef" # get from for loop
-    postprocess_path = "Evaluation/resources/json/gemm_layer_RN50x4.json"
-    textEmbeddings_path = "Evaluation/resources/json/textEmbeddings_RN50x4.json"
+    models_path = "Evaluation/modelscut"
     calibrationData_path = Path("calibrationData")
-    calibrationOutout_Path = Path("Evaluation/Data/Hailo/calibration")
+    calibrationOutout_Path = Path("Evaluation/Data/HailoCut/calibration")
+    outputPath_InOut = calibrationOutout_Path / "Indoor_outdoor"
+    outputPath_Indoor = calibrationOutout_Path / "Indoor"
+    outputPath_Outdoor = calibrationOutout_Path / "Outdoor"
     main()

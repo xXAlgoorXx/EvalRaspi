@@ -92,7 +92,7 @@ def  main():
             df_pred.to_csv(csv_path_predictions, index=False)
             df_5patch = get_trueClass(pd.read_csv(csv_path_predictions))
         df = df_5patch.copy()
-        df['y_predIO'] = df.apply(get_max_class_with_threshold, axis=1, threshold=0.75)
+        df['y_predIO'] = df.apply(get_max_class_with_threshold, axis=1, threshold=0.8)
 
         # set the outdoor classes to 0 when the image was classified as indoor 
         # set the indoor classes to 0 when the image was classified as outdoor 
@@ -135,7 +135,9 @@ def  main():
         IO_pred = [replacements.get(item, item) for item in majority_pred]
         IO_true = [replacements.get(item, item) for item in y_test_s]
 
-        accuracy = accuracy_score(IO_true, IO_pred)
+        # accuracy = accuracy_score(IO_true, IO_pred)
+        # accuracy_models.append(accuracy)
+        accuracy = accuracy_score(y_test_s, majority_pred)
         accuracy_models.append(accuracy)
         print(f'Accuracy: {accuracy:.3f}')
 

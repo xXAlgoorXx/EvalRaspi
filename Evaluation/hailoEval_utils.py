@@ -408,7 +408,8 @@ class HailofastCLIPImage:
     """
     def __init__(
         self, hef_path: str, postprocess_Path, batch_size: int = 1,
-        send_original_frame: bool = False, is_data_batched:bool = False) -> None:
+        send_original_frame: bool = False, is_data_batched:bool = False,
+        isnewCut:bool = False) -> None:
 
         self.input_queue = queue.Queue()
         self.output_queue = queue.Queue()
@@ -443,7 +444,7 @@ class HailofastCLIPImage:
                 self.postprocess = RestOfGraph(postprocess_Path)
                 self.jsonPostprocess = True
             else:
-                self.postprocess = RestOfGraphOnnx(postprocess_Path)
+                self.postprocess = RestOfGraphOnnx(postprocess_Path,isnewCut)
                 self.jsonPostprocess = False
                 
     def __del__(self):
@@ -664,7 +665,8 @@ class RestOfGraphOnnx:
     """
     GemmLayer which got cut off
     """
-    def __init__(self,onnx_path):
+    def __init__(self,onnx_path,isnewCut=False):
+        self.isnewCut = isnewCut
         self.session = ort.InferenceSession(onnx_path)
         model = onnx.load(onnx_path)
         output =[node.name for node in model.graph.output]
@@ -674,10 +676,10 @@ class RestOfGraphOnnx:
         print('Inputs: ', self.input_name)
         
     def __call__(self,input):
-        # input = np.array(list(input.values())[0]).squeeze()
+        input = np.array(list(input)).squeeze()
         if input.ndim == 1:
             input = input[np.newaxis,:]
-        elif input.ndim == 2:
+        elif input.ndim == 2 and self.isnewCut == True:
             input = input[:,np.newaxis,:]
         result = self.session.run(None, {self.input_name: input})
         result = np.array(result).squeeze(0)

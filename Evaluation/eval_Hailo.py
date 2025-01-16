@@ -5,20 +5,27 @@ from pathlib import Path
 from utils import printAndSaveClassReport,printClassificationReport,get_max_class_with_threshold,get_trueClass,find_majority_element,printAndSaveHeatmap
 from hailoEval_utils import get_pred_hailo,get_throughput_hailo, HailoCLIPImage, HailoCLIPText,getModelfiles,get_throughput_hailo_image,HailofastCLIPImage
 
+"""
+Evaluates CLIP and TinyCLIP models on Hailo yy.
+Same code as on PC
+"""
+
 # Pathes
-outputPath = Path("Evaluation/Data/HailoCut")
+outputPath = Path("Evaluation/Data/HailoCutThused")
 Dataset5Patch224px = Path("candolle_5patches_224px")
 Dataset5Patch = Path("candolle_5patch")
 tinyClipModels = Path("tinyClipModels")
 models_path = "Evaluation/modelscut"
 
 def main():
-    #InOutTh_dict = {'RN50':0.63, 'RN50x4':0.52, 'TinyClip19M':0.51, 'RN101':0.78, 'TinyClip30M':0.72,'TinyClip19M16Bit':0.45}
-    InOutTh_dict = {'RN50':0.5, 'RN50x4':0.5, 'TinyClip19M':0.5, 'RN101':0.5, 'TinyClip30M':0.5, 'TinyClip19M16Bit':0.5}
+    InOutTh_dict = {'RN50':0.63, 'RN50x4':0.52, 'TinyClip19M':0.51, 'RN101':0.78, 'TinyClip30M':0.72,'TinyClip19M16Bit':0.45}
+    # InOutTh_dict = {'RN50':0.5, 'RN50x4':0.5, 'TinyClip19M':0.5, 'RN101':0.5, 'TinyClip30M':0.5, 'TinyClip19M16Bit':0.5}
     df_perf_acc = pd.DataFrame(columns=["Modelname"])
     accuracy_models = []
     balanced_accuracy_models = []
-    useNewCut = True
+    useNewCut = False
+    if "cut" in models_path:
+        useNewCut = True
         
     # Throughput evaluation
     throughput_model_mean = []
@@ -56,11 +63,15 @@ def main():
 
         # check if csv already exists
         if os.path.exists(csv_path_predictions):
-            df_5patch = get_trueClass(pd.read_csv(csv_path_predictions))
+            df_5patch = pd.read_csv(csv_path_predictions)
+            df_5patch = df_5patch.sort_values(["Scene","Image"],ascending=[True,True])
+            df_5patch = get_trueClass(df_5patch)
         else:
             df_pred = get_pred_hailo(Dataset5Patch,hailoModelImage=hailoImagemodel,hailoModelText=hailoTextmodel,use5Scentens = False)
             df_pred.to_csv(csv_path_predictions, index=False)
-            df_5patch = get_trueClass(pd.read_csv(csv_path_predictions))
+            df_5patch = pd.read_csv(csv_path_predictions)
+            df_5patch = df_5patch.sort_values(["Scene","Image"],ascending=[True,True])
+            df_5patch = get_trueClass(df_5patch)
         df = df_5patch.copy()
         threshold = InOutTh_dict[modelname]
         df['y_predIO'] = df.apply(get_max_class_with_threshold, axis=1, threshold=threshold)

@@ -1,6 +1,6 @@
 import os
 import pandas as pd
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, balanced_accuracy_score
 from tqdm import tqdm
 from pathlib import Path
 import clip
@@ -8,6 +8,11 @@ import open_clip
 import torch
 from utils import printAndSaveClassReport,printClassificationReport,get_max_class_with_threshold,get_trueClass,find_majority_element,printAndSaveHeatmap
 from cpuEval_utils import get_throughput,get_pred,get_throughput_image
+
+"""
+Evaluates CLIP and TinyCLIP models on Raspberry Pi CPU.
+Same code as on PC
+"""
 
 # Pathes
 outputPath = Path("Evaluation/Data/CPU")
@@ -51,6 +56,7 @@ def  main():
     resnetModels.remove("RN50x16")
     resnetModels.remove("RN50x64")
     accuracy_models = []
+    balanced_accuracy_models = []
     for modelname in tqdm(resnetModels,position=0,desc="Models"):
 
         # Path to csv
@@ -61,7 +67,9 @@ def  main():
 
         # check if csv already exists
         if os.path.exists(csv_path_predictions):
-            df_5patch = get_trueClass(pd.read_csv(csv_path_predictions))
+            df_5patch = pd.read_csv(csv_path_predictions)
+            df_5patch = df_5patch.sort_values(["Scene","Image"],ascending=[True,True])
+            df_5patch = get_trueClass(df_5patch)
         else:
             try:
                 if os.path.exists(tinyClipModels/ f"modelname"):
@@ -90,7 +98,9 @@ def  main():
                     text3 = clip.tokenize(names3).to(device)
             df_pred = get_pred(Dataset5Patch, text1, text2, text3,preprocess,model,use5Scentens)
             df_pred.to_csv(csv_path_predictions, index=False)
-            df_5patch = get_trueClass(pd.read_csv(csv_path_predictions))
+            df_5patch = pd.read_csv(csv_path_predictions)
+            df_5patch = df_5patch.sort_values(["Scene","Image"],ascending=[True,True])
+            df_5patch = get_trueClass(df_5patch)
         df = df_5patch.copy()
         df['y_predIO'] = df.apply(get_max_class_with_threshold, axis=1, threshold=0.8)
 
@@ -137,9 +147,12 @@ def  main():
 
         # accuracy = accuracy_score(IO_true, IO_pred)
         # accuracy_models.append(accuracy)
+        balanced_accuracy = balanced_accuracy_score(y_test_s, majority_pred)
         accuracy = accuracy_score(y_test_s, majority_pred)
         accuracy_models.append(accuracy)
+        balanced_accuracy_models.append(balanced_accuracy)
         print(f'Accuracy: {accuracy:.3f}')
+        print(f'Balanced Accuracy: {balanced_accuracy:.3f}')
 
         printAndSaveHeatmap(df,modelname,outputPath,use5Scentens)
         
@@ -174,7 +187,8 @@ def  main():
         }, ignore_index=True)
     accuracy_models = [ '%.3f' % elem for elem in accuracy_models ]
     df_perf_acc["Accuracy"] = accuracy_models
-
+    balanced_accuracy_models = [ '%.3f' % elem for elem in balanced_accuracy_models ]
+    df_perf_acc["Balanced accuracy"] = balanced_accuracy_models
     # Throughput evaluation
     throughput_model_mean = []
     throughput_model_std = []
